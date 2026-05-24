@@ -1,0 +1,14 @@
+ÁRVORE SINTÁTICA:
+
+('FROM_IMPORT', 'math', 'sqrt')
+('IMPORT', 'os')
+('ATRIBUICAO', 'x', ('NUMERO', '10'))
+('ATRIBUICAO', 'y', ('NUMERO', '20'))
+('ATRIBUICAO', 'resultado', ('BINARIA', '+', ('VARIAVEL', 'x'), ('BINARIA', '*', ('VARIAVEL', 'y'), ('NUMERO', '2'))))
+('CLASS', 'Pessoa')
+('ATRIBUICAO', 'nome', ('STRING', '"João"'))
+('FUNCAO', 'soma')
+('RETURN', ('BINARIA', '+', ('VARIAVEL', 'x'), ('VARIAVEL', 'y')))
+('NUMERO', '0.0')
+('NUMERO', '0')
+('ERRO', '[Linha 19] Erro léxico: Número mal formado')
