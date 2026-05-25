@@ -37,4 +37,11 @@ LINHA  | COL  | CATEGORIA            | LEXEMA
 17     | 1    | NUMERO               | 0.0
 18     | 1    | NUMERO               | 0
 19     | 1    | ERRO_LEXICO          | Número mal formado
-19     | 6    | FIM_DE_ARQUIVO       | EOF
+21     | 1    | IDENTIFICADOR        | x
+21     | 3    | OPERADOR             | =
+21     | 5    | NUMERO               | 10
+21     | 8    | OPERADOR             | +
+21     | 10   | NUMERO               | 5
+21     | 12   | OPERADOR             | *
+21     | 14   | NUMERO               | 2
+21     | 15   | FIM_DE_ARQUIVO       | EOF
