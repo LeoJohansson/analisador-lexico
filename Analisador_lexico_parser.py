@@ -170,7 +170,21 @@ class AnalisadorLexico:
         return self.tokens
 
 # ==========================================
-# 4. PARSER
+# 4. TABELA DE SÍMBOLOS (SEMÂNTICO)
+# ==========================================
+
+class TabelaSimbolos:
+    def __init__(self):
+        self.simbolos = set()
+
+    def declarar(self, nome):
+        self.simbolos.add(nome)
+
+    def existe(self, nome):
+        return nome in self.simbolos
+
+# ==========================================
+# 5. PARSER + SEMÂNTICO INTEGRADO
 # ==========================================
 
 class Parser:
@@ -178,8 +192,9 @@ class Parser:
         self.tokens = tokens
         self.atual = 0
         self.erros = []
+        self.tabela = TabelaSimbolos() # <-- Integração do Semântico aqui!
 
-    # --- NAVEGAÇÃO ---
+    # --- NAVEGAÇÃO  ---
 
     def token_atual(self):
         return self.tokens[self.atual]
@@ -204,7 +219,7 @@ class Parser:
         if self.verificar(lexema):
             return self.avancar()
         token = self.token_atual()
-        raise Exception(f"[Linha {token.linha}] Erro sintático: {mensagem}")
+        raise Exception(f"[Linha {token.linha}] Erro Sintático: {mensagem}")
 
     # --- LOOP PRINCIPAL E DECLARAÇÕES ---
 
@@ -227,7 +242,7 @@ class Parser:
             self.avancar()
             return None
         if token.tipo == TipoToken.ERRO:
-            erro = f"[Linha {token.linha}] Erro léxico: {token.lexema}"
+            erro = f"[Linha {token.linha}] Erro Léxico: {token.lexema}"
             self.avancar()
             return ('ERRO', erro)
             
@@ -247,7 +262,7 @@ class Parser:
 
         return self.expressao()
 
-    # --- REGRAS DE GRAMÁTICA ---
+    # --- REGRAS DE GRAMÁTICA COM SEMÂNTICA ---
 
     def declaracao_import(self):
         self.consumir('import', "Esperado 'import'")
@@ -261,49 +276,57 @@ class Parser:
         nome = self.avancar()
         return ('FROM_IMPORT', origem.lexema, nome.lexema)
 
-    # Consome o class, pega o nome, ignora o : (se houver)
     def declaracao_class(self):
         self.consumir('class', "Esperado 'class'")
         nome = self.avancar()
-        if self.verificar(':'): self.avancar()
         
-        # O corpo captura a próxima declaração
+        self.tabela.declarar(nome.lexema) # Regra Semântica: Registra a classe
+        
+        if self.verificar(':'): self.avancar()
         corpo = []
         if not self.no_final():
             corpo.append(self.declaracao())
-            
         return ('CLASS', nome.lexema, corpo)
 
     def declaracao_funcao(self):
         self.consumir('def', "Esperado 'def'")
         nome = self.avancar()
-        parametros = []
         
-        # Lê os parâmetros dinamicamente
+        self.tabela.declarar(nome.lexema) # Regra Semântica: Registra a função
+        escopo_anterior = self.tabela.simbolos.copy() # Salva escopo atual
+        
+        parametros = []
         if self.verificar('('):
             self.avancar()
             if not self.verificar(')'):
                 if self.verificar_tipo(TipoToken.IDENTIFICADOR):
-                    parametros.append(self.avancar().lexema)
+                    param = self.avancar().lexema
+                    parametros.append(param)
+                    self.tabela.declarar(param) # Regra Semântica: Registra o parâmetro no escopo local
                 while self.verificar(','):
-                    self.avancar() # consome a vírgula
+                    self.avancar()
                     if self.verificar_tipo(TipoToken.IDENTIFICADOR):
-                        parametros.append(self.avancar().lexema)
+                        param = self.avancar().lexema
+                        parametros.append(param)
+                        self.tabela.declarar(param) # Regra Semântica
             self.consumir(')', "Esperado ')'")
             
         if self.verificar(':'): self.avancar()
         
-        # O corpo captura a próxima declaração (ex: o return)
         corpo = []
         if not self.no_final():
             corpo.append(self.declaracao())
             
+        self.tabela.simbolos = escopo_anterior # Regra Semântica: Limpa escopo local
         return ('FUNCAO', nome.lexema, parametros, corpo)
 
     def atribuicao(self):
         nome = self.avancar()
         self.consumir('=', "Esperado '='")
-        return ('ATRIBUICAO', nome.lexema, self.expressao())
+        expr = self.expressao()
+        
+        self.tabela.declarar(nome.lexema) # Regra Semântica: Registra a variável após resolver a expressão
+        return ('ATRIBUICAO', nome.lexema, expr)
 
     def expressao(self):
         return self.termo()
@@ -333,9 +356,14 @@ class Parser:
         if token.tipo == TipoToken.STRING:
             self.avancar()
             return ('STRING', token.lexema)
+        
         if token.tipo == TipoToken.IDENTIFICADOR:
             self.avancar()
+            # Regra Semântica Central: Verifica se a variável existe!
+            if not self.tabela.existe(token.lexema):
+                self.erros.append(f"[Linha {token.linha}] Erro Semântico: A variável '{token.lexema}' não foi declarada.")
             return ('VARIAVEL', token.lexema)
+            
         if token.lexema == '(':
             self.avancar()
             expr = self.expressao()
@@ -345,7 +373,7 @@ class Parser:
         raise Exception(f"[Linha {token.linha}] Token inesperado: {token.lexema}")
 
 # ==========================================
-# 5. PROCESSAMENTO E EXECUÇÃO
+# 6. PROCESSAMENTO E EXECUÇÃO
 # ==========================================
 
 def processar(entrada, saida_tokens, saida_ast):
@@ -356,33 +384,30 @@ def processar(entrada, saida_tokens, saida_ast):
     with open(entrada, 'r', encoding='utf-8') as f:
         codigo = f.read()
 
-    # Lexer
+    # 1. Analisador Léxico
     lexer = AnalisadorLexico(codigo)
     tokens = lexer.analisar()
 
-    # Salvar Tokens
     with open(saida_tokens, 'w', encoding='utf-8') as f:
         f.write(f"{'LINHA':<6} | {'COL':<4} | {'CATEGORIA':<20} | {'LEXEMA'}\n")
         f.write("-" * 70 + "\n")
         for t in tokens:
             f.write(f"{t.linha:<6} | {t.coluna:<4} | {t.tipo.value:<20} | {t.lexema}\n")
 
-    # Parser
+    # 2. Analisador Sintático + Semântico (Passagem Única)
     parser = Parser(tokens)
     ast = parser.analisar()
 
-    # Salvar AST
+    # 3. Salvar Resultados (AST + Erros Integrados)
     with open(saida_ast, 'w', encoding='utf-8') as f:
         f.write("ÁRVORE SINTÁTICA:\n\n")
         for item in ast:
             f.write(f"{item}\n")
         
         if parser.erros:
-            f.write("\n\nERROS:\n\n")
+            f.write("\n\nERROS ENCONTRADOS (Sintáticos e Semânticos):\n")
             for erro in parser.erros:
-                f.write(f"{erro}\n")
-
-    print("Análise concluída.")
+                f.write(f"- {erro}\n")
 
 if __name__ == "__main__":
     processar('teste.py', 'saida_tokens.txt', 'saida_ast.txt')

@@ -4,10 +4,15 @@
 ('IMPORT', 'os')
 ('ATRIBUICAO', 'x', ('NUMERO', '10'))
 ('ATRIBUICAO', 'y', ('NUMERO', '20'))
-('ATRIBUICAO', 'resultado', ('BINARIA', '+', ('VARIAVEL', 'x'), ('BINARIA', '*', ('VARIAVEL', 'y'), ('NUMERO', '2'))))
+('ATRIBUICAO', 'resultado', ('BINARIA', '+', ('VARIAVEL', 'x'), ('BINARIA', '*', ('VARIAVEL', 'z'), ('NUMERO', '2'))))
 ('CLASS', 'Pessoa', [('ATRIBUICAO', 'nome', ('STRING', '"João"'))])
-('FUNCAO', 'soma', [], [('RETURN', ('BINARIA', '+', ('VARIAVEL', 'x'), ('VARIAVEL', 'y')))])
+('FUNCAO', 'soma', ['a', 'b'], [('RETURN', ('BINARIA', '+', ('BINARIA', '+', ('VARIAVEL', 'a'), ('VARIAVEL', 'b')), ('VARIAVEL', 'c')))])
 ('NUMERO', '0.0')
 ('NUMERO', '0')
-('ERRO', '[Linha 19] Erro léxico: Número mal formado')
+('ERRO', '[Linha 19] Erro Léxico: Número mal formado')
 ('ATRIBUICAO', 'x', ('BINARIA', '+', ('NUMERO', '10'), ('BINARIA', '*', ('NUMERO', '5'), ('NUMERO', '2'))))
+
+
+ERROS ENCONTRADOS (Sintáticos e Semânticos):
+- [Linha 8] Erro Semântico: A variável 'z' não foi declarada.
+- [Linha 15] Erro Semântico: A variável 'c' não foi declarada.
