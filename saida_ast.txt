@@ -4,15 +4,32 @@
 ('IMPORT', 'os')
 ('ATRIBUICAO', 'x', ('NUMERO', '10'))
 ('ATRIBUICAO', 'y', ('NUMERO', '20'))
+('ATRIBUICAO', 'p', ('NUMERO', '56.43'))
+('ATRIBUICAO', 'x', ('BINARIA', '+', ('NUMERO', '10'), ('BINARIA', '*', ('NUMERO', '5'), ('NUMERO', '2'))))
 ('ATRIBUICAO', 'resultado', ('BINARIA', '+', ('VARIAVEL', 'x'), ('BINARIA', '*', ('VARIAVEL', 'z'), ('NUMERO', '2'))))
 ('CLASS', 'Pessoa', [('ATRIBUICAO', 'nome', ('STRING', '"João"'))])
 ('FUNCAO', 'soma', ['a', 'b'], [('RETURN', ('BINARIA', '+', ('BINARIA', '+', ('VARIAVEL', 'a'), ('VARIAVEL', 'b')), ('VARIAVEL', 'c')))])
+('ATRIBUICAO', 'teste_soma', ('BINARIA', '+', ('BINARIA', '+', ('VARIAVEL', 'x'), ('VARIAVEL', 'y')), ('VARIAVEL', 'p')))
+('ATRIBUICAO', 'teste_soma2', ('BINARIA', '+', ('VARIAVEL', 'x'), ('VARIAVEL', 'y')))
 ('NUMERO', '0.0')
 ('NUMERO', '0')
-('ERRO', '[Linha 19] Erro Léxico: Número mal formado')
-('ATRIBUICAO', 'x', ('BINARIA', '+', ('NUMERO', '10'), ('BINARIA', '*', ('NUMERO', '5'), ('NUMERO', '2'))))
+('ERRO', '[Linha 22] Erro Léxico: Número mal formado')
+('ATRIBUICAO', 'interrompido', ('VARIAVEL', 'conta_errada'))
+('BINARIA', '+', ('NUMERO', '5'), ('BINARIA', '*', ('NUMERO', '2'), ('VARIAVEL', 'x')))
+
+
+AVISOS SEMÂNTICOS (WARNINGS):
+- [Linha 7] Aviso Semântico: Reatribuição/Redeclaração da variável 'x'.
+- A variável 'resultado' foi declarada, mas nunca foi utilizada.
+- A variável 'nome' foi declarada, mas nunca foi utilizada.
+- A variável 'teste_soma' foi declarada, mas nunca foi utilizada.
+- A variável 'teste_soma2' foi declarada, mas nunca foi utilizada.
+- A variável 'interrompido' foi declarada, mas nunca foi utilizada.
 
 
 ERROS ENCONTRADOS (Sintáticos e Semânticos):
 - [Linha 8] Erro Semântico: A variável 'z' não foi declarada.
 - [Linha 15] Erro Semântico: A variável 'c' não foi declarada.
+- [Linha 26] Erro Semântico: A variável 'conta_errada' não foi declarada.
+- [Linha 26] Token inesperado: =
+- [Linha 28] Token inesperado: EOF
