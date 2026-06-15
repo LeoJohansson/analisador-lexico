@@ -16,20 +16,3 @@
 ('ERRO', '[Linha 22] Erro Léxico: Número mal formado')
 ('ATRIBUICAO', 'interrompido', ('VARIAVEL', 'conta_errada'))
 ('BINARIA', '+', ('NUMERO', '5'), ('BINARIA', '*', ('NUMERO', '2'), ('VARIAVEL', 'x')))
-
-
-AVISOS SEMÂNTICOS (WARNINGS):
-- [Linha 7] Aviso Semântico: Reatribuição/Redeclaração da variável 'x'.
-- A variável 'resultado' foi declarada, mas nunca foi utilizada.
-- A variável 'nome' foi declarada, mas nunca foi utilizada.
-- A variável 'teste_soma' foi declarada, mas nunca foi utilizada.
-- A variável 'teste_soma2' foi declarada, mas nunca foi utilizada.
-- A variável 'interrompido' foi declarada, mas nunca foi utilizada.
-
-
-ERROS ENCONTRADOS (Sintáticos e Semânticos):
-- [Linha 8] Erro Semântico: A variável 'z' não foi declarada.
-- [Linha 15] Erro Semântico: A variável 'c' não foi declarada.
-- [Linha 26] Erro Semântico: A variável 'conta_errada' não foi declarada.
-- [Linha 26] Token inesperado: =
-- [Linha 28] Token inesperado: EOF

@@ -170,7 +170,7 @@ class AnalisadorLexico:
         return self.tokens
 
 # ==========================================
-# 4. TABELA DE SÍMBOLOS (SEMÂNTICO COM TIPOS)
+# 4. TABELA DE SÍMBOLOS
 # ==========================================
 
 class TabelaSimbolos:
@@ -201,7 +201,7 @@ class Parser:
 
     # --- NAVEGAÇÃO E AUXILIARES ---
     def token_atual(self): return self.tokens[self.atual]
-    
+
     def no_final(self): return self.token_atual().tipo == TipoToken.EOF
 
     def avancar(self):
@@ -400,27 +400,26 @@ def processar(entrada, saida_tokens, saida_ast, saida_tabela):
         f.write("ÁRVORE SINTÁTICA:\n\n")
         for item in ast:
             f.write(f"{item}\n")
-        
-        if parser.warnings:
-            f.write("\n\nAVISOS SEMÂNTICOS (WARNINGS):\n")
-            print(f"\n⚠️  {len(parser.warnings)} AVISO(S) SEMÂNTICO(S) ENCONTRADO(S):")
-            for aviso in parser.warnings:
-                f.write(f"- {aviso}\n")
-                print(f"   -> Aviso: {aviso}")
-        
-        if parser.erros:
-            f.write("\n\nERROS ENCONTRADOS (Sintáticos e Semânticos):\n")
-            for erro in parser.erros:
-                f.write(f"- {erro}\n")
+            
+    print(f"Árvore Sintática gravada com sucesso em: '{saida_ast}'")
+
+    if parser.warnings:
+        print("\n" + "="*50)
+        print(f"⚠️  AVISOS SEMÂNTICOS (WARNINGS): {len(parser.warnings)}")
+        print("="*50)
+        for aviso in parser.warnings:
+            print(f" - {aviso}")
+
+    if parser.erros:
+        print("\n" + "="*50)
+        print(f"❌ ERROS ENCONTRADOS (Sintáticos e Semânticos): {len(parser.erros)}")
+        print("="*50)
+        for erro in parser.erros:
+            print(f" - {erro}")
 
     # 4. EXIBIR E GRAVAR TABELA DE SÍMBOLOS
     
     cabecalho = f"{'IDENTIFICADOR':<20} | {'TIPO INFERIDO'}\n" + "-" * 45
-    
-    print("\n" + "="*45)
-    print("  TABELA DE SÍMBOLOS COM INFERÊNCIA DE TIPOS  ")
-    print("="*45)
-    print(cabecalho)
     
     with open(saida_tabela, 'w', encoding='utf-8') as f:
         f.write("="*45 + "\n")
@@ -429,16 +428,14 @@ def processar(entrada, saida_tokens, saida_ast, saida_tabela):
         f.write(cabecalho + "\n")
         
         if not parser.tabela.simbolos:
-            print("Nenhum símbolo registrado.")
             f.write("Nenhum símbolo registrado.\n")
         else:
+            # Grava a tabela silenciosamente apenas no arquivo txt
             for simbolo, tipo in sorted(parser.tabela.simbolos.items()):
                 linha_formatada = f"{simbolo:<20} | {tipo}"
-                print(linha_formatada)
                 f.write(linha_formatada + "\n")
                 
-    print("="*45 + "\n")
-    print(f"Tabela de Símbolos gravada com sucesso em: '{saida_tabela}'")
+    print(f"\nTabela de Símbolos gravada com sucesso em: '{saida_tabela}'")
 
 if __name__ == "__main__":
     processar('teste.py', 'saida_tokens.txt', 'saida_ast.txt', 'saida_tabela.txt')
