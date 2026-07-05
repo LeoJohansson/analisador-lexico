@@ -370,10 +370,98 @@ class Parser:
         raise Exception(f"[Linha {token.linha}] Token inesperado: {token.lexema}")
 
 # ==========================================
-# 6. PROCESSAMENTO E EXECUÇÃO
+# 6. GERADOR DE CÓDIGO (ASSEMBLY BASEADO EM PILHA)
 # ==========================================
 
-def processar(entrada, saida_tokens, saida_ast, saida_tabela):
+class GeradorCodigo:
+    def __init__(self, ast):
+        self.ast = ast
+        self.instrucoes = []
+
+    def gerar(self):
+        self.instrucoes.append("; --- CÓDIGO INICIADO ---")
+        for nodo in self.ast:
+            self.visitar(nodo)
+        self.instrucoes.append("; --- FIM DO PROGRAMA ---")
+        return self.instrucoes
+
+    def visitar(self, nodo):
+        if nodo is None:
+            return
+
+        tipo_nodo = nodo[0]
+
+        if tipo_nodo == 'ATRIBUICAO':
+            # nodo = ('ATRIBUICAO', 'nome_var', expr_nodo)
+            nome_var = nodo[1]
+            expr_nodo = nodo[2]
+            
+            # 1. Gera as instruções para calcular o valor da expressão (vai deixar o resultado no topo da pilha)
+            self.visitar(expr_nodo)
+            # 2. Despila o resultado e armazena na variável
+            self.instrucoes.append(f"STORE {nome_var}")
+
+        elif tipo_nodo == 'BINARIA':
+            # nodo = ('BINARIA', 'op', esq_nodo, dir_nodo)
+            op = nodo[1]
+            esq = nodo[2]
+            p_dir = nodo[3]
+
+            # 1. Avalia o lado esquerdo (joga na pilha)
+            self.visitar(esq)
+            # 2. Avalia o lado direito (joga na pilha)
+            self.visitar(p_dir)
+
+            # 3. Aplica a instrução correspondente do operador
+            if op == '+': self.instrucoes.append("ADD")
+            elif op == '-': self.instrucoes.append("SUB")
+            elif op == '*': self.instrucoes.append("MUL")
+            elif op == '/': self.instrucoes.append("DIV")
+
+        elif tipo_nodo == 'NUMERO':
+            # nodo = ('NUMERO', 'valor')
+            self.instrucoes.append(f"PUSH {nodo[1]}")
+
+        elif tipo_nodo == 'VARIAVEL':
+            # nodo = ('VARIAVEL', 'nome_var')
+            # Recupera o valor da variável e joga na pilha para ser usado na conta
+            self.instrucoes.append(f"LOAD {nodo[1]}")
+
+        elif tipo_nodo == 'STRING':
+            self.instrucoes.append(f"PUSH_STR {nodo[1]}")
+
+        elif tipo_nodo == 'FUNCAO':
+            # nodo = ('FUNCAO', 'nome', [params], [corpo])
+            nome_funcao = nodo[1]
+            corpo = nodo[3]
+            
+            self.instrucoes.append(f"\nLABEL {nome_funcao}:")
+            for comando in corpo:
+                self.visitar(comando)
+            self.instrucoes.append("RET")
+
+        elif tipo_nodo == 'RETURN':
+            # nodo = ('RETURN', expr_nodo)
+            self.visitar(nodo[1])
+            # O topo da pilha passa a ser o valor de retorno
+
+        elif tipo_nodo == 'CLASS':
+            # nodo = ('CLASS', 'nome', [corpo])
+            nome_classe = nodo[1]
+            corpo = nodo[2]
+            self.instrucoes.append(f"\n; --- DEFINIÇÃO DA CLASSE {nome_classe} ---")
+            for comando in corpo:
+                self.visitar(comando)
+
+        elif tipo_nodo in ['IMPORT', 'FROM_IMPORT']:
+            # Metadados que o gerador de baixo nível ignora ou trata como diretiva
+            self.instrucoes.append(f"; EXTERN {nodo[1]}")
+
+# ==========================================
+# 7. PROCESSAMENTO E EXECUÇÃO
+# ==========================================
+
+def processar(entrada, saida_tokens, saida_ast, saida_tabela, saida_codigo):
     if not os.path.exists(entrada):
         print("Arquivo não encontrado.")
         return
@@ -437,5 +525,17 @@ def processar(entrada, saida_tokens, saida_ast, saida_tabela):
                 
     print(f"\nTabela de Símbolos gravada com sucesso em: '{saida_tabela}'")
 
+
+    # 5. GERADOR DE CÓDIGO ALVO (NOVO)
+
+    gerador = GeradorCodigo(ast)
+    codigo_assembly = gerador.gerar()
+
+    with open(saida_codigo, 'w', encoding='utf-8') as f:
+        for linha in codigo_assembly:
+            f.write(linha + "\n")
+
+    print(f"Código Assembly Target gerado com sucesso em: '{saida_codigo}'")
+
 if __name__ == "__main__":
-    processar('teste.py', 'saida_tokens.txt', 'saida_ast.txt', 'saida_tabela.txt')
+    processar('teste.py', 'saida_tokens.txt', 'saida_ast.txt', 'saida_tabela.txt', 'saida_codigo.asm')

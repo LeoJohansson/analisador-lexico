@@ -1,0 +1,6 @@
+saida_tokens.txt
+saida_ast.txt
+saida_tabela.txt
+saida_codigo.asm
+__pycache__/
+.pytest_cache/
