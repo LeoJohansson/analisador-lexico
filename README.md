@@ -1,217 +1,66 @@
-# 🧠 Analisador Léxico e Sintático em Python
+# 🧠 Compilador Completo em Python (End-to-End)
 
-Este projeto implementa um **analisador léxico (scanner)** e um **analisador sintático (parser)** desenvolvidos em Python, como parte da disciplina de **Compiladores**.
+Este projeto implementa um **compilador didático completo** desenvolvido em Python como parte da disciplina de **Compiladores**. 
 
-O sistema realiza duas etapas principais:
+O sistema cobre desde a leitura dos caracteres do código-fonte até a geração final de código de baixo nível, operando de forma resiliente mesmo diante de erros estruturais na entrada.
 
-- 🔎 **Análise Léxica** → transforma o código fonte em uma sequência de tokens
-- 🌳 **Análise Sintática** → interpreta os tokens e gera uma AST (*Abstract Syntax Tree*)
-
-O analisador léxico identifica os elementos básicos da linguagem, enquanto o parser organiza esses elementos de acordo com regras gramaticais.
+O compilador realiza quatro etapas principais:
+- 🔎 **Análise Léxica** → Transforma o código-fonte em uma sequência de tokens.
+- 🌳 **Análise Sintática** → Organiza os tokens em uma árvore através de um *Recursive Descent Parser* que gera uma AST (*Abstract Syntax Tree*).
+- 🧬 **Análise Semântica** → Gerencia o escopo através de uma Tabela de Símbolos, realiza a inferência dinâmica de tipos e gera diagnósticos (avisos/erros).
+- ⚙️ **Geração de Código Target** → Traduz de forma linear a AST resultante para **Assembly Baseado em Pilha (P-Code)**.
 
 ---
 
-# 🚀 Funcionalidades
+# 🚀 Funcionalidades Reconhecidas
 
-O sistema reconhece e processa os seguintes elementos:
-
-- 🔑 **Palavras reservadas** (`if`, `while`, `return`, `class`, `def`, `import`, etc.)
+O sistema reconhece e processa os seguintes elementos da linguagem (baseada na sintaxe do Python):
+- 🔑 **Palavras Reservadas** (`if`, `while`, `return`, `class`, `def`, `import`, etc.)
 - 🏷️ **Identificadores** (nomes de variáveis, funções e classes)
-- 🔢 **Literais** (números inteiros, reais e strings)
-- ➕ **Operadores** (`+`, `-`, `*`, `/`, `==`, `!=`, etc.)
-- 📌 **Delimitadores** (`()`, `{}`, `[]`, `:`, `,`, `.` etc.)
-- 🧾 **Comentários** (ignorados pelo analisador)
-- ⚠️ **Erros léxicos** (símbolos inválidos, strings não finalizadas e números mal formados)
-- 🌳 **Geração de AST simplificada**
-- 📄 **EOF (End Of File)**
+- 🔢 **Literais Numéricos e Strings** (suporte nativo a inteiros e ponto flutuante)
+- ➕ **Operadores Matemáticos** (`+`, `-`, `*`, `/`) com precedência rigorosa.
+- 📌 **Delimitadores** (`()`, `{}`, `[]`, `:`, `,`, `.`)
+- 📄 **Recuperação de Falhas (Panic Mode)** que permite continuar a compilação mesmo sob erros sintáticos graves.
 
 ---
 
-# ⚙️ Como funciona
+# 🛠️ Como Funciona cada Fase
 
-O analisador léxico utiliza a técnica de **dois ponteiros**:
+### 1. Analisador Léxico
+Utiliza a técnica de **dois ponteiros** (`inicio` e `atual`) para percorrer o arquivo caractere por caractere. Conta com um mecanismo de **Lookahead** (espiar próximo caractere) para capturar perfeitamente tokens compostos (como `==`, `!=`) e validar constantes de ponto flutuante, acusando erros específicos como números mal formados (`0.0.0`).
 
-- `inicio` → marca o início do token
-- `atual` → percorre o código caractere por caractere
+### 2. Analisador Sintático (Parser)
+Implementado por meio da técnica de **Parser Descendente Recursivo**. Cada regra gramatical é mapeada em um método específico. O parser respeita a precedência matemática (multiplicação e divisão aninhadas abaixo da soma e subtração) e isola o corpo de funções e classes. Ele captura erros de sintaxe (como a falta de termos à direita de uma atribuição) e avança para a próxima linha de forma segura sem abortar o processo.
 
-Além disso, utiliza **lookahead** para identificar tokens compostos, como:
+### 3. Analisador Semântico (Single-Pass com Tipagem)
+Operando de forma integrada à sintaxe (Tradução Dirigida pela Sintaxe), ele gerencia uma **Tabela de Símbolos** dinâmica e um mapa de uso. Suas funções incluem:
+* **Verificação de Declaração Prévia:** Bloqueia a leitura de variáveis que nunca foram criadas no escopo.
+* **Inferência Dinâmica de Tipos:** Promove tipos de dados em expressões binárias automaticamente (ex: $int + float = float$).
+* **Gerador de Warnings:** Identifica e avisa no terminal sobre reatribuições de variáveis ou identificadores que foram declarados mas estão ociosos consumindo memória.
+* **Controle de Escopo Local:** Copia, isola e destrói o contexto de variáveis locais ao encerrar o processamento de funções.
 
-- `==`
-- `!=`
-- `<=`
-- `>=`
-
-Após a análise léxica, os tokens são enviados ao parser.
-
-O parser foi implementado utilizando a técnica de **Recursive Descent Parser (Parser Descendente Recursivo)**, onde cada método representa uma regra da gramática.
-
-O parser também implementa:
-
-- atribuições
-- expressões aritméticas
-- precedência de operadores
-- importações
-- funções
-- classes
-- retorno (`return`)
-- recuperação simples de erros
+### 4. Gerador de Código Target
+Caminha recursivamente pela AST gerada e mapeia as estruturas hierárquicas em instruções de um **Assembly Linear Baseado em Pilha**. Ele simula o comportamento físico de uma máquina virtual gerando rótulos estruturados (`LABEL`), desvios de sub-rotinas (`RET`), manipulações diretas de empilhamento (`PUSH`, `POP`, `LOAD`) e instruções matemáticas de máquina (`ADD`, `SUB`, `MUL`, `DIV`).
 
 ---
 
-# 📂 Estrutura do Projeto
+# 📂 Estrutura das Classes do Projeto
 
-- `TipoToken` → Enum com as categorias de tokens
-- `Token` → Estrutura que representa um token
-- `AnalisadorLexico` → Classe principal do scanner
-- `Parser` → Classe responsável pela análise sintática
-- `processar()` → Função que executa todo o fluxo do sistema
-
----
-
-# ▶️ Como executar
-
-## 1. Crie um arquivo de entrada
-
-Exemplo:
-
-```python
-teste.py
-```
+- `TipoToken` → Enum com as categorias lexicais.
+- `Token` → Estrutura do objeto que armazena tipo, lexema, linha e coluna.
+- `AnalisadorLexico` → Responsável pelo fatiamento do texto em tokens.
+- `TabelaSimbolos` → Dicionário interno encarregado do armazenamento de tipos e escopo do programa.
+- `Parser` → Motor sintático e semântico encarregado da montagem da AST e geração de alertas.
+- `GeradorCodigo` → O back-end do compilador que produz as instruções Assembly.
+- `processar()` → Orquestrador central que gerencia o fluxo de arquivos de entrada e saída.
 
 ---
 
-## 2. Execute o script
+# ▶️ Como Executar
 
+### 1. Prepare o arquivo de entrada
+Crie o arquivo de testes contendo seu código-fonte na mesma pasta do script (ex: `teste.py`).
+
+### 2. Execute o Compilador
 ```bash
-python nome_do_arquivo.py
-```
-
----
-
-## 3. Arquivos gerados
-
-O programa irá gerar os arquivos:
-
-```txt
-saida_tokens.txt
-saida_ast.txt
-```
-
----
-
-# 📊 Saída Léxica
-
-O arquivo `saida_tokens.txt` contém:
-
-- linha
-- coluna
-- categoria do token
-- lexema original
-
-## Exemplo
-
-```txt
-LINHA  | COL  | CATEGORIA            | LEXEMA
-----------------------------------------------------------------------
-1      | 1    | PALAVRA_RESERVADA    | from
-1      | 6    | IDENTIFICADOR        | math
-1      | 11   | PALAVRA_RESERVADA    | import
-1      | 18   | IDENTIFICADOR        | sqrt
-```
-
----
-
-# 🌳 Saída Sintática
-
-O arquivo `saida_ast.txt` contém a AST (*Árvore Sintática Abstrata*) gerada pelo parser.
-
-## Exemplo
-
-```txt
-ÁRVORE SINTÁTICA:
-
-('FROM_IMPORT', 'math', 'sqrt')
-('IMPORT', 'os')
-('ATRIBUICAO', 'x', ('NUMERO', '10'))
-('ATRIBUICAO', 'y', ('NUMERO', '20'))
-('ATRIBUICAO', 'resultado', ('BINARIA', '+', ('VARIAVEL', 'x'), ('BINARIA', '*', ('VARIAVEL', 'y'), ('NUMERO', '2'))))
-('CLASS', 'Pessoa')
-('ATRIBUICAO', 'nome', ('STRING', '"João"'))
-('FUNCAO', 'soma')
-('RETURN', ('BINARIA', '+', ('VARIAVEL', 'x'), ('VARIAVEL', 'y')))
-('NUMERO', '0.0')
-('NUMERO', '0')
-('ERRO', '[Linha 19] Erro léxico: Número mal formado')
-```
-
----
-
-# ⚠️ Tratamento de Erros
-
-O sistema identifica erros léxicos como:
-
-- caracteres inválidos (`@`, `$`, etc.)
-- strings não finalizadas
-- números mal formados (`0.0.0`)
-
-Nestes casos, é gerado um nó de erro na AST:
-
-```txt
-('ERRO', '[Linha 19] Erro léxico: Número mal formado')
-```
-
-Também são tratados erros sintáticos, como:
-
-- ausência de `)`
-- ausência de `=`
-- tokens inesperados
-
-O parser implementa uma recuperação simples de erro para continuar a análise mesmo após encontrar problemas.
-
----
-
-# 📌 Observações
-
-- Comentários são reconhecidos, mas ignorados
-- Strings podem utilizar aspas simples `'` ou duplas `"`
-- Suporte a números inteiros e reais
-- O parser respeita precedência de operadores:
-  - multiplicação/divisão antes de soma/subtração
-- AST representada utilizando tuplas Python
-- Implementação inspirada na sintaxe da linguagem Python
-
----
-
-# 🎓 Objetivo Acadêmico
-
-Este projeto foi desenvolvido com o objetivo de compreender na prática:
-
-- funcionamento de um analisador léxico
-- construção de parsers
-- geração de AST
-- reconhecimento de padrões em linguagens formais
-- estrutura básica de compiladores
-- tratamento de erros léxicos e sintáticos
-
----
-
-# 👨‍💻 Autor
-
-Desenvolvido para fins acadêmicos na disciplina de Compiladores.
-
----
-
-# 📎 Possíveis melhorias
-
-- implementação de análise semântica
-- tabela de símbolos
-- verificação de tipos
-- suporte completo à identação do Python
-- suporte a condicionais e loops completos
-- AST baseada em classes de nós
-- visualização gráfica da árvore sintática
-- implementação de interpretador
-
----
-
-💡 *Projeto didático com foco no aprendizado de compiladores, análise léxica e análise sintática.*
+python compilador.py
