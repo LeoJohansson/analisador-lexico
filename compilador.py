@@ -199,6 +199,20 @@ class Parser:
         self.variaveis_usadas = {}
         self.tabela = TabelaSimbolos()
 
+        # --- GERAÇÃO DE CÓDIGO (feita junto com o parsing, tradução dirigida pela sintaxe) ---
+        self.codigo_gerado = []   # lista de instruções emitidas durante o parsing
+        self.contador_temp = 0    # contador para nomear temporários T1, T2, T3...
+
+    # --- GERAÇÃO DE CÓDIGO ---
+    def novo_temp(self):
+        """ Gera o nome de um novo registrador/variável temporária """
+        self.contador_temp += 1
+        return f"T{self.contador_temp}"
+
+    def emitir(self, instrucao):
+        """ Adiciona uma instrução à lista de código gerado, na hora em que a regra gramatical é reduzida """
+        self.codigo_gerado.append(instrucao)
+
     # --- NAVEGAÇÃO E AUXILIARES ---
     def token_atual(self): return self.tokens[self.atual]
 
@@ -259,7 +273,8 @@ class Parser:
         if token.lexema == 'def': return self.declaracao_funcao()
         if token.lexema == 'return':
             self.avancar()
-            expr_nodo, _ = self.expressao()
+            expr_nodo, _, local = self.expressao()
+            self.emitir(f"RETURN {local}")           # <-- código emitido assim que o 'return' é reduzido
             return ('RETURN', expr_nodo)
         
         if (self.verificar_tipo(TipoToken.IDENTIFICADOR) and 
@@ -267,7 +282,7 @@ class Parser:
             self.tokens[self.atual + 1].lexema == '='):
             return self.atribuicao()
 
-        expr_nodo, _ = self.expressao()
+        expr_nodo, _, _ = self.expressao()
         return expr_nodo
 
     def declaracao_import(self):
@@ -292,6 +307,10 @@ class Parser:
         nome = self.avancar().lexema
         self.tabela.declarar(nome, 'function') 
         escopo_anterior = self.tabela.simbolos.copy() 
+
+        self.emitir("")
+        self.emitir(f"FUNC {nome}:")             # <-- cabeçalho emitido assim que 'def nome' é reconhecido
+
         parametros = []
         if self.verificar('('):
             self.avancar()
@@ -300,165 +319,115 @@ class Parser:
                     param = self.avancar().lexema
                     parametros.append(param)
                     self.tabela.declarar(param, 'int')
+                    self.emitir(f"  PARAM {param}")       # <-- cada parâmetro emitido ao ser reconhecido
                 while self.verificar(','):
                     self.avancar()
                     if self.verificar_tipo(TipoToken.IDENTIFICADOR):
                         param = self.avancar().lexema
                         parametros.append(param)
-                        self.tabela.declarar(param, 'int') 
+                        self.tabela.declarar(param, 'int')
+                        self.emitir(f"  PARAM {param}")
             self.consumir(')', "Esperado ')'")
         if self.verificar(':'): self.avancar()
-        corpo = [self.declaracao()] if not self.no_final() else []
+        corpo = [self.declaracao()] if not self.no_final() else []   # corpo já emite seu próprio código ao ser parseado
+
+        self.emitir(f"ENDFUNC {nome}")            # <-- fim da função emitido após o corpo ser totalmente parseado
+
         self.tabela.simbolos = escopo_anterior 
         return ('FUNCAO', nome, parametros, corpo)
 
     def atribuicao(self):
         nome = self.avancar()
         self.consumir('=', "Esperado '='")
-        expr_nodo, expr_tipo = self.expressao()
+        expr_nodo, expr_tipo, local = self.expressao()
         
         if self.tabela.existe(nome.lexema):
             self.warnings.append(f"[Linha {nome.linha}] Aviso Semântico: Reatribuição/Redeclaração da variável '{nome.lexema}'.")
         
         self.tabela.declarar(nome.lexema, expr_tipo) 
+
+        self.emitir(f"STORE {nome.lexema}, {local}")   # <-- código emitido assim que a atribuição é reduzida
+
         return ('ATRIBUICAO', nome.lexema, expr_nodo)
 
     def expressao(self): return self.termo()
 
+    # Cada regra devolve (nó_da_arvore, tipo_inferido, local_onde_o_valor_esta)
+    # 'local' é um temporário (T1, T2...) ou o nome de uma variável já existente
+
     def termo(self):
-        expr, tipo_esq = self.fator()
+        expr, tipo_esq, local_esq = self.fator()
         while self.verificar('+') or self.verificar('-'):
             operador = self.avancar()
-            prox_expr, tipo_dir = self.fator()
+            prox_expr, tipo_dir, local_dir = self.fator()
             tipo_esq = self.inferir_tipo_binario(tipo_esq, tipo_dir)
             expr = ('BINARIA', operador.lexema, expr, prox_expr)
-        return expr, tipo_esq
+
+            # --- código emitido assim que esta regra (termo -> termo +- fator) é reduzida ---
+            temp = self.novo_temp()
+            instrucao = 'ADD' if operador.lexema == '+' else 'SUB'
+            self.emitir(f"{instrucao} {temp}, {local_esq}, {local_dir}")
+            local_esq = temp
+
+        return expr, tipo_esq, local_esq
 
     def fator(self):
-        expr, tipo_esq = self.primario()
+        expr, tipo_esq, local_esq = self.primario()
         while self.verificar('*') or self.verificar('/'):
             operador = self.avancar()
-            prox_expr, tipo_dir = self.primario()
+            prox_expr, tipo_dir, local_dir = self.primario()
             tipo_esq = self.inferir_tipo_binario(tipo_esq, tipo_dir)
             expr = ('BINARIA', operador.lexema, expr, prox_expr)
-        return expr, tipo_esq
+
+            # --- código emitido assim que esta regra (fator -> fator */ primario) é reduzida ---
+            temp = self.novo_temp()
+            instrucao = 'MUL' if operador.lexema == '*' else 'DIV'
+            self.emitir(f"{instrucao} {temp}, {local_esq}, {local_dir}")
+            local_esq = temp
+
+        return expr, tipo_esq, local_esq
 
     def primario(self):
         token = self.token_atual()
         if token.tipo == TipoToken.PALAVRA_RESERVADA:
-            self.avancar(); return ('KEYWORD', token.lexema), 'keyword'
+            self.avancar()
+            temp = self.novo_temp()
+            self.emitir(f"MOV {temp}, {token.lexema}")
+            return ('KEYWORD', token.lexema), 'keyword', temp
+
         if token.tipo == TipoToken.NUMERO:
-            self.avancar(); return ('NUMERO', token.lexema), 'float' if '.' in token.lexema else 'int'
+            self.avancar()
+            temp = self.novo_temp()
+            self.emitir(f"MOV {temp}, {token.lexema}")     # <-- constante carregada assim que é reconhecida
+            return ('NUMERO', token.lexema), ('float' if '.' in token.lexema else 'int'), temp
+
         if token.tipo == TipoToken.STRING:
-            self.avancar(); return ('STRING', token.lexema), 'string'
+            self.avancar()
+            temp = self.novo_temp()
+            self.emitir(f"MOV {temp}, {token.lexema}")
+            return ('STRING', token.lexema), 'string', temp
         
         if token.tipo == TipoToken.IDENTIFICADOR:
             self.avancar()
             if not self.tabela.existe(token.lexema):
                 self.erros.append(f"[Linha {token.linha}] Erro Semântico: A variável '{token.lexema}' não foi declarada.")
-                return ('VARIAVEL', token.lexema), 'unknown'
+                return ('VARIAVEL', token.lexema), 'unknown', token.lexema
             
             self.variaveis_usadas[token.lexema] = True
-            
-            return ('VARIAVEL', token.lexema), self.tabela.obter_tipo(token.lexema)
+
+            # variável já tem endereço próprio: não precisa de MOV, seu local é o próprio nome
+            return ('VARIAVEL', token.lexema), self.tabela.obter_tipo(token.lexema), token.lexema
             
         if token.lexema == '(':
             self.avancar()
-            expr, tipo = self.expressao()
+            expr, tipo, local = self.expressao()
             self.consumir(')', "Esperado ')'")
-            return expr, tipo
+            return expr, tipo, local
         raise Exception(f"[Linha {token.linha}] Token inesperado: {token.lexema}")
 
-# ==========================================
-# 6. GERADOR DE CÓDIGO (ASSEMBLY BASEADO EM PILHA)
-# ==========================================
-
-class GeradorCodigo:
-    def __init__(self, ast):
-        self.ast = ast
-        self.instrucoes = []
-
-    def gerar(self):
-        self.instrucoes.append("; --- CÓDIGO INICIADO ---")
-        for nodo in self.ast:
-            self.visitar(nodo)
-        self.instrucoes.append("; --- FIM DO PROGRAMA ---")
-        return self.instrucoes
-
-    def visitar(self, nodo):
-        if nodo is None:
-            return
-
-        tipo_nodo = nodo[0]
-
-        if tipo_nodo == 'ATRIBUICAO':
-            # nodo = ('ATRIBUICAO', 'nome_var', expr_nodo)
-            nome_var = nodo[1]
-            expr_nodo = nodo[2]
-            
-            # 1. Gera as instruções para calcular o valor da expressão (vai deixar o resultado no topo da pilha)
-            self.visitar(expr_nodo)
-            # 2. Despila o resultado e armazena na variável
-            self.instrucoes.append(f"STORE {nome_var}")
-
-        elif tipo_nodo == 'BINARIA':
-            # nodo = ('BINARIA', 'op', esq_nodo, dir_nodo)
-            op = nodo[1]
-            esq = nodo[2]
-            p_dir = nodo[3]
-
-            # 1. Avalia o lado esquerdo (joga na pilha)
-            self.visitar(esq)
-            # 2. Avalia o lado direito (joga na pilha)
-            self.visitar(p_dir)
-
-            # 3. Aplica a instrução correspondente do operador
-            if op == '+': self.instrucoes.append("ADD")
-            elif op == '-': self.instrucoes.append("SUB")
-            elif op == '*': self.instrucoes.append("MUL")
-            elif op == '/': self.instrucoes.append("DIV")
-
-        elif tipo_nodo == 'NUMERO':
-            # nodo = ('NUMERO', 'valor')
-            self.instrucoes.append(f"PUSH {nodo[1]}")
-
-        elif tipo_nodo == 'VARIAVEL':
-            # nodo = ('VARIAVEL', 'nome_var')
-            # Recupera o valor da variável e joga na pilha para ser usado na conta
-            self.instrucoes.append(f"LOAD {nodo[1]}")
-
-        elif tipo_nodo == 'STRING':
-            self.instrucoes.append(f"PUSH_STR {nodo[1]}")
-
-        elif tipo_nodo == 'FUNCAO':
-            # nodo = ('FUNCAO', 'nome', [params], [corpo])
-            nome_funcao = nodo[1]
-            corpo = nodo[3]
-            
-            self.instrucoes.append(f"\nLABEL {nome_funcao}:")
-            for comando in corpo:
-                self.visitar(comando)
-            self.instrucoes.append("RET")
-
-        elif tipo_nodo == 'RETURN':
-            # nodo = ('RETURN', expr_nodo)
-            self.visitar(nodo[1])
-            # O topo da pilha passa a ser o valor de retorno
-
-        elif tipo_nodo == 'CLASS':
-            # nodo = ('CLASS', 'nome', [corpo])
-            nome_classe = nodo[1]
-            corpo = nodo[2]
-            self.instrucoes.append(f"\n; --- DEFINIÇÃO DA CLASSE {nome_classe} ---")
-            for comando in corpo:
-                self.visitar(comando)
-
-        elif tipo_nodo in ['IMPORT', 'FROM_IMPORT']:
-            # Metadados que o gerador de baixo nível ignora ou trata como diretiva
-            self.instrucoes.append(f"; EXTERN {nodo[1]}")
 
 # ==========================================
-# 7. PROCESSAMENTO E EXECUÇÃO
+# 6. PROCESSAMENTO E EXECUÇÃO
 # ==========================================
 
 def processar(entrada, saida_tokens, saida_ast, saida_tabela, saida_codigo):
@@ -525,17 +494,20 @@ def processar(entrada, saida_tokens, saida_ast, saida_tabela, saida_codigo):
                 
     print(f"\nTabela de Símbolos gravada com sucesso em: '{saida_tabela}'")
 
-
-    # 5. GERADOR DE CÓDIGO ALVO (NOVO)
-
-    gerador = GeradorCodigo(ast)
-    codigo_assembly = gerador.gerar()
-
+    # 5. GRAVAR CÓDIGO GERADO
+    # O código NÃO é gerado aqui: ele já foi produzido instrução por instrução
+    # dentro do próprio Parser (em atribuicao, termo, fator, primario, etc.),
+    # à medida que cada regra da gramática era reduzida durante o parsing.
+    # Aqui só pegamos o resultado acumulado em parser.codigo_gerado.
     with open(saida_codigo, 'w', encoding='utf-8') as f:
-        for linha in codigo_assembly:
-            f.write(linha + "\n")
+        f.write("; ===== CÓDIGO GERADO (durante o parsing) =====\n")
+        f.write("\n".join(parser.codigo_gerado))
+        f.write("\n; ===== FIM =====\n")
 
-    print(f"Código Assembly Target gerado com sucesso em: '{saida_codigo}'")
+    print(f"Código gerado gravado com sucesso em: '{saida_codigo}'")
+    if parser.erros:
+        print("⚠️  Atenção: o código foi gerado mesmo havendo erros sintáticos/semânticos.")
+
 
 if __name__ == "__main__":
     processar('teste.py', 'saida_tokens.txt', 'saida_ast.txt', 'saida_tabela.txt', 'saida_codigo.asm')
